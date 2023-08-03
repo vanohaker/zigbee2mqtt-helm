@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "zigbee2mqtt.fullname" . }}
+  labels:
+    {{- include "zigbee2mqtt.labels" . | nindent 4 }}
+data:
+  configuration.yaml: |
+    homeassistant: false
+    permit_join: {{ default "true" .Values.zigbee2mqtt.deployment.configuration.prtmitJoin }}
+    mqtt:
+      base_topic: {{ default "zigbee2mqtt" .Values.zigbee2mqtt.deployment.configuration.baseTopicName }}
+      server: mqtt://{{ default "masquito.masquito.svc" .Values.zigbee2mqtt.deployment.configuration.mqttServerName }}:{{ default "1883" .Values.zigbee2mqtt.deployment.configuration.mqttServerPort }}
+    serial:
+      port: /dev/ttyACM0
+    advanced:
+      pan_id: 35205
+      ext_pan_id:
+        - 255
+        - 63
+        - 75
+        - 48
+        - 231
+        - 22
+        - 169
+        - 186
+      network_key:
+        - 115
+        - 23
+        - 246
+        - 32
+        - 249
+        - 137
+        - 208
+        - 117
+        - 3
+        - 29
+        - 220
+        - 195
+        - 161
+        - 22
+        - 251
+        - 127
+      homeassistant_legacy_entity_attributes: false
+      legacy_api: false
+      legacy_availability_payload: false
+    device_options:
+      legacy: false
+    {{- if .Values.zigbee2mqtt.deployment.frontend.enabled }}
+    frontend:
+      port: {{ .Values.zigbee2mqtt.deployment.frontend.port }}
+    {{- end }}
