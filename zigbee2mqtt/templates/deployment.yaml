@@ -13,8 +13,9 @@ spec:
     {{- toYaml .Values.zigbee2mqtt.deployment.strategy | nindent 4 }}
   template:
     metadata:
-      {{- with .Values.zigbee2mqtt.deployment.annotations }}
       annotations:
+        zigbee2mqtt/configmap:  {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      {{- with .Values.zigbee2mqtt.deployment.annotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
@@ -27,9 +28,6 @@ spec:
       serviceAccountName: {{ include "zigbee2mqtt.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.securityContext | nindent 8 }}
-      {{- if .Values.zigbee2mqtt.deployment.initContainer.enabled }}
-      initContainers:
-      {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           {{- if .Values.zigbee2mqtt.deployment.podSecurityContext }}
@@ -38,12 +36,14 @@ spec:
           {{- end }}
           image: {{ include "zigbee2mqtt.image.name" . }}
           imagePullPolicy: {{ .Values.zigbee2mqtt.deployment.image.pullPolicy }}
-          {{- if .Values.zigbee2mqtt.deployment.debug }}
           command:
-            - "/bin/bash"
+            - "/bin/sh"
             - "-c"
           args:
+          {{- if .Values.zigbee2mqtt.deployment.debug }}
             - "sleep infinity"
+          {{- else }}
+            - "/initconfig.sh"
           {{- end }}
           {{- if .Values.zigbee2mqtt.deployment.frontend.enabled }}
           ports:
@@ -55,17 +55,33 @@ spec:
           resources:
             {{- toYaml .Values.zigbee2mqtt.deployment.resources | nindent 12 }}
           {{- end }}
+          env:
+          - name: ZIGBEE2MQTT_CONFIG_HOMEASSISTANT
+            value: {{ .Values.zigbee2mqtt.deployment.configuration.homeassistant | quote }}
+          - name: ZIGBEE2MQTT_CONFIG_PERMITJOIN
+            value: {{ .Values.zigbee2mqtt.deployment.configuration.permitjoin | quote }}
+          - name: ZIGBEE2MQTT_CONFIG_MQTT_BASETOPIC
+            value: {{ .Values.zigbee2mqtt.deployment.configuration.baseTopicName | quote }}
+          - name: ZIGBEE2MQTT_CONFIG_MQTT_SERVER
+            value: {{ .Values.zigbee2mqtt.deployment.configuration.mqttServerName | quote }}
+          - name: ZIGBEE2MQTT_CONFIG_SERIAL_PORT
+            value: {{ .Values.zigbee2mqtt.deployment.configuration.serialport | quote }}
+          - name: ZIGBEE2MQTT_CONFIG_ADVANCED_PANID
+            value: {{ .Values.zigbee2mqtt.deployment.configuration.panid | quote }}
+          {{- if .Values.zigbee2mqtt.deployment.frontend.enabled }}
+          - name: ZIGBEE2MQTT_CONFIG_FRONTEND_PORT
+            value: {{ .Values.zigbee2mqtt.deployment.frontend.port | quote }}
+          {{- end }}
           {{- if or .Values.persistent.enabled .Values.zigbee2mqtt.deployment.devicePath }}
           volumeMounts:
-            - name: zigbee2mqtt-config
-              mountPath: /app/data/configuration.yaml
-              subPath: configuration.yaml
-          {{- if .Values.persistent.enabled }}
             - mountPath: "/app/data"
               name: zigbee2mqtt-data
-          {{- end }}
+              readOnly: false
+            - mountPath: "/initconfig.sh"
+              name: zigbee2mqtt-config
+              subPath: initconfig.sh
           {{- if .Values.zigbee2mqtt.deployment.devicePath }}
-            - mountPath: "/dev/ttyUSB0"
+            - mountPath: "/dev/ttyACM0"
               name: zigbeedongle
           {{- end }}
           {{- end }}
@@ -85,6 +101,7 @@ spec:
       - name: zigbee2mqtt-config
         configMap:
           name: {{ include "zigbee2mqtt.fullname" . }}
+          defaultMode: 0755
       {{- if or .Values.persistent.enabled .Values.zigbee2mqtt.deployment.devicePath }}
       - name: zigbee2mqtt-data
       {{- if .Values.persistent.enabled }}

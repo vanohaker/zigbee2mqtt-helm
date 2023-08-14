@@ -74,3 +74,10 @@ image name
 {{- define "zigbee2mqtt.image.name" -}}
 {{ printf "%s:%s" .Values.zigbee2mqtt.deployment.image.repository (default .Chart.AppVersion .Values.zigbee2mqtt.deployment.image.tag )}}
 {{- end }}
+
+{{/*
+service name
+*/}}
+{{- define "zigbee2mqtt.frontend.service.name" -}}
+{{ printf "%s-fronetnd" (include "zigbee2mqtt.fullname" .)}}
+{{- end }}

@@ -8,8 +8,9 @@ serviceAccount:
 
 securityContext:
   runAsNonRoot: false
-  runAsUser: 1000
-  runAsGroup: 1000
+  runAsUser: 0
+  runAsGroup: 0
+  fsGroup: 0
 
 persistent:
   enabled: false
@@ -28,6 +29,7 @@ zigbee2mqtt:
     labels: {}
     annotations: {}
     podSecurityContext:
+      privileged: true
       readOnlyRootFilesystem: false
       capabilities:
         drop:
@@ -37,16 +39,17 @@ zigbee2mqtt:
       repository: koenkk/zigbee2mqtt
       pullPolicy: IfNotPresent
       tag: ""
-    initContainer:
-      enabled: false
     frontend:
       enabled: true
       port: 8080
+    env: []
     configuration:
-      prtmitJoin: ""
-      baseTopicName: ""
-      mqttServerName: ""
-      mqttServerPort: 1883
+      homeassistant: "false"
+      permitjoin: "false"
+      baseTopicName: "zigbee2mqtt"
+      mqttServerName: "mqtt://localhost:1883"
+      serialport: "/dev/ttyACM0"
+      panid: ""
     devicePath: /dev/ttyUSB0
     resources: {}
       # limits:
@@ -60,7 +63,6 @@ zigbee2mqtt:
     affinity: {}
   service:
     type: ClusterIP
-    port: 80
 
 ingress:
   enabled: false
@@ -69,10 +71,10 @@ ingress:
     # kubernetes.io/ingress.class: nginx
     # kubernetes.io/tls-acme: "true"
   hosts:
-    - host: chart-example.local
+    - host: zigbee2mqtt.hostname
       paths:
         - path: /
-          pathType: ImplementationSpecific
+          pathType: Prefix
   tls: []
   #  - secretName: chart-example-tls
   #    hosts:

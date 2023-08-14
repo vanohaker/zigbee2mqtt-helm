@@ -5,48 +5,67 @@ metadata:
   labels:
     {{- include "zigbee2mqtt.labels" . | nindent 4 }}
 data:
-  configuration.yaml: |
-    homeassistant: false
-    permit_join: {{ default "true" .Values.zigbee2mqtt.deployment.configuration.prtmitJoin }}
-    mqtt:
-      base_topic: {{ default "zigbee2mqtt" .Values.zigbee2mqtt.deployment.configuration.baseTopicName }}
-      server: mqtt://{{ default "masquito.masquito.svc" .Values.zigbee2mqtt.deployment.configuration.mqttServerName }}:{{ default "1883" .Values.zigbee2mqtt.deployment.configuration.mqttServerPort }}
-    serial:
-      port: /dev/ttyACM0
-    advanced:
-      pan_id: 35205
-      ext_pan_id:
-        - 255
-        - 63
-        - 75
-        - 48
-        - 231
-        - 22
-        - 169
-        - 186
-      network_key:
-        - 115
-        - 23
-        - 246
-        - 32
-        - 249
-        - 137
-        - 208
-        - 117
-        - 3
-        - 29
-        - 220
-        - 195
-        - 161
-        - 22
-        - 251
-        - 127
-      homeassistant_legacy_entity_attributes: false
-      legacy_api: false
-      legacy_availability_payload: false
-    device_options:
-      legacy: false
-    {{- if .Values.zigbee2mqtt.deployment.frontend.enabled }}
-    frontend:
-      port: {{ .Values.zigbee2mqtt.deployment.frontend.port }}
-    {{- end }}
+  initconfig.sh: |
+    #!/bin/sh
+    
+    DAPAPATH="/app/data"
+    CONFIGFILE="configuration.yaml"
+    FULLCONFIGPATH="${DAPAPATH}/${CONFIGFILE}"
+    
+    if [ -f ${DAPAPATH}/yq/yq_linux_amd64 ]; then
+      echo "YQ installed"
+    else
+      mkdir ${DAPAPATH}/yq
+      wget  -O ${DAPAPATH}/yq/yq.tar.gz https://github.com/mikefarah/yq/releases/download/v4.34.2/yq_linux_amd64.tar.gz
+      cd ${DAPAPATH}/yq
+      tar xvf ./yq.tar.gz ./yq_linux_amd64
+      rm -rf yq.tar.gz
+    fi
+    
+    setconfvar() {
+        local param=$1 variable=$2
+        if [ ${variable} = "true" ] || [ ${variable} = "false" ]; then
+          echo "Set ${param}=${variable} ${FULLCONFIGPATH}"
+          ${DAPAPATH}/yq/yq_linux_amd64 e ${param}=${variable} -i ${FULLCONFIGPATH}
+        else
+          echo "Set ${param}=\"${variable}\" ${FULLCONFIGPATH}"
+          ${DAPAPATH}/yq/yq_linux_amd64 e ${param}=\"${variable}\" -i ${FULLCONFIGPATH}
+        fi
+    }
+    
+    setupconfigfile() {
+      if [ ! -z ${ZIGBEE2MQTT_CONFIG_HOMEASSISTANT} ]; then
+        setconfvar ".homeassistant" "${ZIGBEE2MQTT_CONFIG_HOMEASSISTANT}"
+      fi
+      if [ ! -z ${ZIGBEE2MQTT_CONFIG_PERMITJOIN} ]; then
+        setconfvar ".permit_join" "${ZIGBEE2MQTT_CONFIG_PERMITJOIN}"
+      fi
+      if [ ! -z ${ZIGBEE2MQTT_CONFIG_MQTT_BASETOPIC} ]; then
+        setconfvar ".mqtt.base_topic" "${ZIGBEE2MQTT_CONFIG_MQTT_BASETOPIC}"
+      fi
+      if [ ! -z ${ZIGBEE2MQTT_CONFIG_MQTT_SERVER} ]; then
+        setconfvar ".mqtt.server" "${ZIGBEE2MQTT_CONFIG_MQTT_SERVER}"
+      fi
+      if [ ! -z ${ZIGBEE2MQTT_CONFIG_SERIAL_PORT} ]; then
+        setconfvar ".server.port" "${ZIGBEE2MQTT_CONFIG_SERIAL_PORT}"
+      fi
+      if [ ! -z ${ZIGBEE2MQTT_CONFIG_FRONTEND_PORT} ]; then
+        setconfvar ".frontend.port" "$ZIGBEE2MQTT_CONFIG_FRONTEND_PORT"
+      fi
+    }
+    
+    if [ -f "${FULLCONFIGPATH}" ]; then
+        echo "File ${FULLCONFIGPATH} exist "
+        echo "Set config paramert from ENV variables"
+        setupconfigfile
+    else
+      echo "File ${FULLCONFIGPATH} not exist"
+      echo "Create ${FULLCONFIGPATH} file"
+      touch ${FULLCONFIGPATH}
+      setupconfigfile
+      if [ ! -z ${ZIGBEE2MQTT_CONFIG_ADVANCED_PANID} ]; then
+        setconfvar ".advanced.pan_id" "GENERATE"
+      fi
+    fi
+    cd /app
+    node index.js
